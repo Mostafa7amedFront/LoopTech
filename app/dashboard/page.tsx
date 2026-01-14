@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Trash2, LogOut, FolderOpen, ImageIcon, X } from "lucide-react"
+import { Plus, Trash2, LogOut, FolderOpen, ImageIcon, X, Upload, Link } from "lucide-react"
 
 interface Project {
   id: string
@@ -29,6 +29,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [imageType, setImageType] = useState<"upload" | "link">("upload")
   const [newProject, setNewProject] = useState({
     title: "",
     category: categories[0],
@@ -59,6 +60,17 @@ export default function DashboardPage() {
     router.push("/login")
   }
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setNewProject({ ...newProject, image: reader.result as string })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault()
     const project: Project = {
@@ -71,6 +83,7 @@ export default function DashboardPage() {
     setProjects(updatedProjects)
     localStorage.setItem("looptech_projects", JSON.stringify(updatedProjects))
     setNewProject({ title: "", category: categories[0], image: "" })
+    setImageType("upload")
     setShowAddModal(false)
   }
 
@@ -179,7 +192,11 @@ export default function DashboardPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6 relative">
             <button
-              onClick={() => setShowAddModal(false)}
+              onClick={() => {
+                setShowAddModal(false)
+                setImageType("upload")
+                setNewProject({ title: "", category: categories[0], image: "" })
+              }}
               className="absolute top-4 left-4 text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="w-5 h-5" />
@@ -217,20 +234,107 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              {/* Image URL */}
               <div>
-                <label className="block text-sm font-medium mb-2">رابط الصورة (اختياري)</label>
-                <div className="relative">
-                  <ImageIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input
-                    type="url"
-                    value={newProject.image}
-                    onChange={(e) => setNewProject({ ...newProject, image: e.target.value })}
-                    className="w-full bg-muted border border-border rounded-xl py-3 pr-11 pl-4 focus:outline-none focus:border-primary transition-colors"
-                    placeholder="https://example.com/image.jpg"
-                  />
+                <label className="block text-sm font-medium mb-2">صورة المشروع (اختياري)</label>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageType("upload")
+                      setNewProject({ ...newProject, image: "" })
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium transition-colors ${
+                      imageType === "upload"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Upload className="w-4 h-4" />
+                    رفع صورة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageType("link")
+                      setNewProject({ ...newProject, image: "" })
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium transition-colors ${
+                      imageType === "link"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Link className="w-4 h-4" />
+                    رابط صورة
+                  </button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً لاستخدام صورة افتراضية</p>
+
+                {imageType === "upload" && (
+                  <div>
+                    <label className="block w-full cursor-pointer">
+                      <div
+                        className={`w-full border-2 border-dashed rounded-xl py-6 px-4 text-center transition-colors ${
+                          newProject.image ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        {newProject.image ? (
+                          <div className="space-y-3">
+                            <img
+                              src={newProject.image || "/placeholder.svg"}
+                              alt="Preview"
+                              className="w-full h-32 object-cover rounded-lg mx-auto"
+                            />
+                            <p className="text-sm text-primary">تم رفع الصورة بنجاح</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
+                            <p className="text-sm text-muted-foreground">اضغط لاختيار صورة</p>
+                            <p className="text-xs text-muted-foreground">PNG, JPG, WEBP</p>
+                          </div>
+                        )}
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                    </label>
+                    {newProject.image && (
+                      <button
+                        type="button"
+                        onClick={() => setNewProject({ ...newProject, image: "" })}
+                        className="mt-2 text-sm text-red-500 hover:text-red-400"
+                      >
+                        إزالة الصورة
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {imageType === "link" && (
+                  <div>
+                    <div className="relative">
+                      <ImageIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <input
+                        type="url"
+                        value={newProject.image}
+                        onChange={(e) => setNewProject({ ...newProject, image: e.target.value })}
+                        className="w-full bg-muted border border-border rounded-xl py-3 pr-11 pl-4 focus:outline-none focus:border-primary transition-colors"
+                        placeholder="https://example.com/image.jpg"
+                      />
+                    </div>
+                    {newProject.image && (
+                      <div className="mt-3">
+                        <img
+                          src={newProject.image || "/placeholder.svg"}
+                          alt="Preview"
+                          className="w-full h-32 object-cover rounded-lg"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/abstract-colorful-swirls.png"
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">اتركه فارغاً لاستخدام صورة افتراضية</p>
               </div>
 
               {/* Buttons */}
@@ -243,7 +347,11 @@ export default function DashboardPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false)
+                    setImageType("upload")
+                    setNewProject({ title: "", category: categories[0], image: "" })
+                  }}
                   className="flex-1 bg-muted text-foreground py-3 rounded-xl font-medium hover:bg-muted/80 transition-colors"
                 >
                   إلغاء
