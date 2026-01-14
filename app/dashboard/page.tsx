@@ -4,24 +4,25 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Trash2, LogOut, FolderOpen, ImageIcon, X, Upload, Link } from "lucide-react"
+import { Plus, Trash2, LogOut, FolderOpen, ImageIcon, X, Upload, Link, ExternalLink } from "lucide-react"
 
 interface Project {
   id: string
   title: string
   category: string
   image: string
+  link?: string
 }
 
 const categories = ["تطوير ويب", "تطبيقات موبايل", "أنظمة مخصصة", "UI/UX Design"]
 
 const defaultProjects: Project[] = [
-  { id: "1", title: "متجر إلكتروني متكامل", category: "تطوير ويب", image: "/ecommerce-store.png" },
-  { id: "2", title: "تطبيق توصيل طعام", category: "تطبيقات موبايل", image: "/food-delivery-app-screen.png" },
-  { id: "3", title: "نظام إدارة مخزون", category: "أنظمة مخصصة", image: "/inventory-system.jpg" },
-  { id: "4", title: "منصة تعليمية", category: "تطوير ويب", image: "/learning-platform.png" },
-  { id: "5", title: "تطبيق حجز مواعيد", category: "تطبيقات موبايل", image: "/booking-app.jpg" },
-  { id: "6", title: "لوحة تحكم تحليلات", category: "UI/UX Design", image: "/analytics-dashboard.png" },
+  { id: "1", title: "متجر إلكتروني متكامل", category: "تطوير ويب", image: "/ecommerce-store.png", link: "" },
+  { id: "2", title: "تطبيق توصيل طعام", category: "تطبيقات موبايل", image: "/food-delivery-app-screen.png", link: "" },
+  { id: "3", title: "نظام إدارة مخزون", category: "أنظمة مخصصة", image: "/inventory-system.jpg", link: "" },
+  { id: "4", title: "منصة تعليمية", category: "تطوير ويب", image: "/learning-platform.png", link: "" },
+  { id: "5", title: "تطبيق حجز مواعيد", category: "تطبيقات موبايل", image: "/booking-app.jpg", link: "" },
+  { id: "6", title: "لوحة تحكم تحليلات", category: "UI/UX Design", image: "/analytics-dashboard.png", link: "" },
 ]
 
 export default function DashboardPage() {
@@ -34,17 +35,16 @@ export default function DashboardPage() {
     title: "",
     category: categories[0],
     image: "",
+    link: "",
   })
 
   useEffect(() => {
-    // Check authentication
     const isAdmin = localStorage.getItem("looptech_admin")
     if (!isAdmin) {
       router.push("/login")
       return
     }
 
-    // Load projects from localStorage or use defaults
     const savedProjects = localStorage.getItem("looptech_projects")
     if (savedProjects) {
       setProjects(JSON.parse(savedProjects))
@@ -78,11 +78,12 @@ export default function DashboardPage() {
       title: newProject.title,
       category: newProject.category,
       image: newProject.image || `/placeholder.svg?height=300&width=400&query=${encodeURIComponent(newProject.title)}`,
+      link: newProject.link,
     }
     const updatedProjects = [...projects, project]
     setProjects(updatedProjects)
     localStorage.setItem("looptech_projects", JSON.stringify(updatedProjects))
-    setNewProject({ title: "", category: categories[0], image: "" })
+    setNewProject({ title: "", category: categories[0], image: "", link: "" })
     setImageType("upload")
     setShowAddModal(false)
   }
@@ -103,7 +104,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -120,9 +120,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-card border border-border rounded-xl p-4 text-center">
             <div className="text-3xl font-bold text-primary">{projects.length}</div>
@@ -138,7 +136,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Add Button */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">المشاريع</h2>
           <button
@@ -150,7 +147,6 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Projects Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project) => (
             <div
@@ -167,6 +163,17 @@ export default function DashboardPage() {
               <div className="p-4">
                 <span className="text-xs text-primary font-medium">{project.category}</span>
                 <h3 className="text-lg font-semibold mt-1">{project.title}</h3>
+                {project.link && (
+                  <a
+                    href={project.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 flex items-center gap-2 text-primary hover:text-primary/80 transition-colors text-sm"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    عرض المشروع
+                  </a>
+                )}
                 <button
                   onClick={() => handleDeleteProject(project.id)}
                   className="mt-3 flex items-center gap-2 text-red-500 hover:text-red-400 transition-colors text-sm"
@@ -187,15 +194,14 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* Add Project Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6 relative">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => {
                 setShowAddModal(false)
                 setImageType("upload")
-                setNewProject({ title: "", category: categories[0], image: "" })
+                setNewProject({ title: "", category: categories[0], image: "", link: "" })
               }}
               className="absolute top-4 left-4 text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -205,7 +211,6 @@ export default function DashboardPage() {
             <h3 className="text-xl font-bold mb-6">إضافة مشروع جديد</h3>
 
             <form onSubmit={handleAddProject} className="space-y-4">
-              {/* Title */}
               <div>
                 <label className="block text-sm font-medium mb-2">اسم المشروع</label>
                 <input
@@ -218,7 +223,6 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Category */}
               <div>
                 <label className="block text-sm font-medium mb-2">التصنيف</label>
                 <select
@@ -232,6 +236,21 @@ export default function DashboardPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">رابط المشروع (اختياري)</label>
+                <div className="relative">
+                  <Link className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <input
+                    type="url"
+                    value={newProject.link}
+                    onChange={(e) => setNewProject({ ...newProject, link: e.target.value })}
+                    className="w-full bg-muted border border-border rounded-xl py-3 pr-11 pl-4 focus:outline-none focus:border-primary transition-colors"
+                    placeholder="https://example.com"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">رابط الموقع أو التطبيق الخاص بالمشروع</p>
               </div>
 
               <div>
@@ -264,7 +283,7 @@ export default function DashboardPage() {
                         : "bg-muted text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <Link className="w-4 h-4" />
+                    <ImageIcon className="w-4 h-4" />
                     رابط صورة
                   </button>
                 </div>
@@ -337,7 +356,6 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground mt-2">اتركه فارغاً لاستخدام صورة افتراضية</p>
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
@@ -350,7 +368,7 @@ export default function DashboardPage() {
                   onClick={() => {
                     setShowAddModal(false)
                     setImageType("upload")
-                    setNewProject({ title: "", category: categories[0], image: "" })
+                    setNewProject({ title: "", category: categories[0], image: "", link: "" })
                   }}
                   className="flex-1 bg-muted text-foreground py-3 rounded-xl font-medium hover:bg-muted/80 transition-colors"
                 >
