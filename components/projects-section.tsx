@@ -37,6 +37,35 @@ export function ProjectsSection() {
     }
 
     fetchProjects()
+
+    const channel = supabase
+      .channel("projects-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "projects",
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            // Add new project at the beginning
+            setProjects((prev) => [payload.new as Project, ...prev])
+          } else if (payload.eventType === "DELETE") {
+            // Remove deleted project
+            setProjects((prev) => prev.filter((p) => p.id !== payload.old.id))
+          } else if (payload.eventType === "UPDATE") {
+            // Update existing project
+            setProjects((prev) => prev.map((p) => (p.id === payload.new.id ? (payload.new as Project) : p)))
+          }
+        },
+      )
+      .subscribe()
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const filteredProjects = activeFilter === "الكل" ? projects : projects.filter((p) => p.category === activeFilter)
