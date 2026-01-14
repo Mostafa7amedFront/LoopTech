@@ -1,42 +1,41 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Trash2, LogOut, FolderOpen, ImageIcon, X, Upload, Link, ExternalLink } from "lucide-react"
-
-interface Project {
-  id: string
-  title: string
-  category: string
-  image: string
-  link?: string
-}
+import { Plus, Trash2, LogOut, FolderOpen, ImageIcon, X, Upload, Link, ExternalLink, Loader2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import type { Project } from "@/types/project"
 
 const categories = ["تطوير ويب", "تطبيقات موبايل", "أنظمة مخصصة", "UI/UX Design"]
 
-const defaultProjects: Project[] = [
-  { id: "1", title: "متجر إلكتروني متكامل", category: "تطوير ويب", image: "/ecommerce-store.png", link: "" },
-  { id: "2", title: "تطبيق توصيل طعام", category: "تطبيقات موبايل", image: "/food-delivery-app-screen.png", link: "" },
-  { id: "3", title: "نظام إدارة مخزون", category: "أنظمة مخصصة", image: "/inventory-system.jpg", link: "" },
-  { id: "4", title: "منصة تعليمية", category: "تطوير ويب", image: "/learning-platform.png", link: "" },
-  { id: "5", title: "تطبيق حجز مواعيد", category: "تطبيقات موبايل", image: "/booking-app.jpg", link: "" },
-  { id: "6", title: "لوحة تحكم تحليلات", category: "UI/UX Design", image: "/analytics-dashboard.png", link: "" },
-]
-
 export default function DashboardPage() {
   const router = useRouter()
+  const supabase = createClient()
   const [projects, setProjects] = useState<Project[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [imageType, setImageType] = useState<"upload" | "link">("upload")
   const [newProject, setNewProject] = useState({
     title: "",
+    description: "",
     category: categories[0],
     image: "",
     link: "",
   })
+
+  const fetchProjects = async () => {
+    const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching projects:", error)
+      return
+    }
+
+    setProjects(data || [])
+  }
 
   useEffect(() => {
     const isAdmin = localStorage.getItem("looptech_admin")
@@ -45,14 +44,7 @@ export default function DashboardPage() {
       return
     }
 
-    const savedProjects = localStorage.getItem("looptech_projects")
-    if (savedProjects) {
-      setProjects(JSON.parse(savedProjects))
-    } else {
-      setProjects(defaultProjects)
-      localStorage.setItem("looptech_projects", JSON.stringify(defaultProjects))
-    }
-    setIsLoading(false)
+    fetchProjects().finally(() => setIsLoading(false))
   }, [router])
 
   const handleLogout = () => {
@@ -71,27 +63,46 @@ export default function DashboardPage() {
     }
   }
 
-  const handleAddProject = (e: React.FormEvent) => {
+  const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault()
-    const project: Project = {
-      id: Date.now().toString(),
+    setIsSubmitting(true)
+
+    const projectData = {
       title: newProject.title,
+      description: newProject.description,
       category: newProject.category,
       image: newProject.image || `/placeholder.svg?height=300&width=400&query=${encodeURIComponent(newProject.title)}`,
-      link: newProject.link,
+      link: newProject.link || null,
     }
-    const updatedProjects = [...projects, project]
-    setProjects(updatedProjects)
-    localStorage.setItem("looptech_projects", JSON.stringify(updatedProjects))
-    setNewProject({ title: "", category: categories[0], image: "", link: "" })
+
+    const { data, error } = await supabase.from("projects").insert([projectData]).select().single()
+
+    if (error) {
+      console.error("Error adding project:", error)
+      setIsSubmitting(false)
+      return
+    }
+
+    setProjects([data, ...projects])
+    setNewProject({ title: "", description: "", category: categories[0], image: "", link: "" })
     setImageType("upload")
     setShowAddModal(false)
+    setIsSubmitting(false)
   }
 
-  const handleDeleteProject = (id: string) => {
-    const updatedProjects = projects.filter((p) => p.id !== id)
-    setProjects(updatedProjects)
-    localStorage.setItem("looptech_projects", JSON.stringify(updatedProjects))
+  const handleDeleteProject = async (id: string) => {
+    setDeletingId(id)
+
+    const { error } = await supabase.from("projects").delete().eq("id", id)
+
+    if (error) {
+      console.error("Error deleting project:", error)
+      setDeletingId(null)
+      return
+    }
+
+    setProjects(projects.filter((p) => p.id !== id))
+    setDeletingId(null)
   }
 
   if (isLoading) {
@@ -163,6 +174,9 @@ export default function DashboardPage() {
               <div className="p-4">
                 <span className="text-xs text-primary font-medium">{project.category}</span>
                 <h3 className="text-lg font-semibold mt-1">{project.title}</h3>
+                {project.description && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
+                )}
                 {project.link && (
                   <a
                     href={project.link}
@@ -176,9 +190,14 @@ export default function DashboardPage() {
                 )}
                 <button
                   onClick={() => handleDeleteProject(project.id)}
-                  className="mt-3 flex items-center gap-2 text-red-500 hover:text-red-400 transition-colors text-sm"
+                  disabled={deletingId === project.id}
+                  className="mt-3 flex items-center gap-2 text-red-500 hover:text-red-400 transition-colors text-sm disabled:opacity-50"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {deletingId === project.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
                   حذف المشروع
                 </button>
               </div>
@@ -201,7 +220,7 @@ export default function DashboardPage() {
               onClick={() => {
                 setShowAddModal(false)
                 setImageType("upload")
-                setNewProject({ title: "", category: categories[0], image: "", link: "" })
+                setNewProject({ title: "", description: "", category: categories[0], image: "", link: "" })
               }}
               className="absolute top-4 left-4 text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -220,6 +239,17 @@ export default function DashboardPage() {
                   className="w-full bg-muted border border-border rounded-xl py-3 px-4 focus:outline-none focus:border-primary transition-colors"
                   placeholder="أدخل اسم المشروع"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">وصف المشروع (اختياري)</label>
+                <textarea
+                  value={newProject.description}
+                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                  className="w-full bg-muted border border-border rounded-xl py-3 px-4 focus:outline-none focus:border-primary transition-colors resize-none"
+                  placeholder="أدخل وصف المشروع"
+                  rows={3}
                 />
               </div>
 
@@ -346,7 +376,7 @@ export default function DashboardPage() {
                           alt="Preview"
                           className="w-full h-32 object-cover rounded-lg"
                           onError={(e) => {
-                            ;(e.target as HTMLImageElement).src = "/abstract-colorful-swirls.png"
+                            ;(e.target as HTMLImageElement).src = "/project-management-team.png"
                           }}
                         />
                       </div>
@@ -359,16 +389,24 @@ export default function DashboardPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 bg-primary text-primary-foreground py-3 rounded-xl font-medium hover:bg-primary/90 transition-colors"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-primary text-primary-foreground py-3 rounded-xl font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  إضافة
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      جاري الإضافة...
+                    </>
+                  ) : (
+                    "إضافة"
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowAddModal(false)
                     setImageType("upload")
-                    setNewProject({ title: "", category: categories[0], image: "", link: "" })
+                    setNewProject({ title: "", description: "", category: categories[0], image: "", link: "" })
                   }}
                   className="flex-1 bg-muted text-foreground py-3 rounded-xl font-medium hover:bg-muted/80 transition-colors"
                 >

@@ -3,42 +3,11 @@
 import { useEffect, useRef, useState } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
-import { ExternalLink } from "lucide-react"
+import { ExternalLink, Loader2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import type { Project } from "@/types/project"
 
 gsap.registerPlugin(ScrollTrigger)
-
-const projects = [
-  {
-    title: "متجر إلكتروني متكامل",
-    category: "تطوير ويب",
-    image: "/modern-ecommerce-dark.png",
-  },
-  {
-    title: "تطبيق توصيل طعام",
-    category: "تطبيقات موبايل",
-    image: "/food-delivery-mobile-app-dark-interface.jpg",
-  },
-  {
-    title: "نظام إدارة مخزون",
-    category: "أنظمة مخصصة",
-    image: "/inventory-management-dashboard-dark-theme.jpg",
-  },
-  {
-    title: "منصة تعليمية",
-    category: "تطوير ويب",
-    image: "/online-learning-platform-dark-mode.jpg",
-  },
-  {
-    title: "تطبيق حجز مواعيد",
-    category: "تطبيقات موبايل",
-    image: "/appointment-booking-app-dark-interface.jpg",
-  },
-  {
-    title: "لوحة تحكم تحليلات",
-    category: "UI/UX Design",
-    image: "/analytics-dashboard-dark-theme-teal-accents.jpg",
-  },
-]
 
 const categories = ["الكل", "تطوير ويب", "تطبيقات موبايل", "أنظمة مخصصة", "UI/UX Design"]
 
@@ -48,6 +17,27 @@ export function ProjectsSection() {
   const filterRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const [activeFilter, setActiveFilter] = useState("الكل")
+  const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("Error fetching projects:", error)
+        setIsLoading(false)
+        return
+      }
+
+      setProjects(data || [])
+      setIsLoading(false)
+    }
+
+    fetchProjects()
+  }, [])
 
   const filteredProjects = activeFilter === "الكل" ? projects : projects.filter((p) => p.category === activeFilter)
 
@@ -88,7 +78,7 @@ export function ProjectsSection() {
   }, [])
 
   useEffect(() => {
-    if (gridRef.current) {
+    if (gridRef.current && !isLoading) {
       gsap.fromTo(
         gridRef.current.children,
         { opacity: 0, y: 40, scale: 0.95 },
@@ -102,7 +92,7 @@ export function ProjectsSection() {
         },
       )
     }
-  }, [activeFilter])
+  }, [activeFilter, isLoading])
 
   return (
     <section ref={sectionRef} id="projects" className="py-24 relative">
@@ -131,35 +121,61 @@ export function ProjectsSection() {
           ))}
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-10 h-10 text-primary animate-spin" />
+          </div>
+        )}
+
         {/* Projects Grid */}
-        <div ref={gridRef} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project, index) => (
-            <div
-              key={`${project.title}-${index}`}
-              className="group relative rounded-2xl overflow-hidden bg-card border border-border hover:border-primary/50 transition-all duration-500"
-            >
-              <div className="relative aspect-video overflow-hidden">
-                <img
-                  src={project.image || "/placeholder.svg"}
-                  alt={project.title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center cursor-pointer hover:scale-110 transition-transform">
-                    <ExternalLink className="w-5 h-5 text-primary-foreground" />
-                  </div>
+        {!isLoading && (
+          <div ref={gridRef} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProjects.map((project) => (
+              <div
+                key={project.id}
+                className="group relative rounded-2xl overflow-hidden bg-card border border-border hover:border-primary/50 transition-all duration-500"
+              >
+                <div className="relative aspect-video overflow-hidden">
+                  <img
+                    src={project.image || "/placeholder.svg?height=300&width=400&query=project"}
+                    alt={project.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  {project.link && (
+                    <a
+                      href={project.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center cursor-pointer hover:scale-110 transition-transform">
+                        <ExternalLink className="w-5 h-5 text-primary-foreground" />
+                      </div>
+                    </a>
+                  )}
+                </div>
+                <div className="p-5">
+                  <span className="text-xs text-primary font-medium">{project.category}</span>
+                  <h3 className="text-lg font-semibold mt-1 text-foreground group-hover:text-primary transition-colors">
+                    {project.title}
+                  </h3>
+                  {project.description && (
+                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{project.description}</p>
+                  )}
                 </div>
               </div>
-              <div className="p-5">
-                <span className="text-xs text-primary font-medium">{project.category}</span>
-                <h3 className="text-lg font-semibold mt-1 text-foreground group-hover:text-primary transition-colors">
-                  {project.title}
-                </h3>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && filteredProjects.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-muted-foreground">لا توجد مشاريع في هذا التصنيف</p>
+          </div>
+        )}
       </div>
     </section>
   )
